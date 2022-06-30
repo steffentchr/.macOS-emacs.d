@@ -1,11 +1,18 @@
 ;;; init.el --- Emacs init file
-;;  Author: Ian Y.E. Pan
-;;; Commentary:
 ;;  This is my personal Emacs configuration
 ;; Installation: brew install emacs-plus --HEAD --without-spacemacs-icon --with-jansson
 ;;; Code:
 (defvar file-name-handler-alist-original file-name-handler-alist)
 
+
+;; key bindings
+(setq mac-option-key-is-meta nil)
+(setq mac-command-key-is-meta t)
+(setq mac-command-modifier 'meta)
+(setq mac-option-modifier nil)
+
+
+;;
 (setq gc-cons-threshold most-positive-fixnum
       gc-cons-percentage 0.6
       file-name-handler-alist nil
@@ -44,7 +51,7 @@
   :preface
   (defvar ian/indent-width 2)
   :config
-  (setq user-full-name "Ian Y.E. Pan")
+  (setq user-full-name "Steffen Fagerström Christensen")
   (setq frame-title-format '("Emacs"))
   (setq ring-bell-function 'ignore)
   (setq-default default-directory "~/")
@@ -61,16 +68,15 @@
   (setq-default line-spacing 3)
   (setq-default indent-tabs-mode nil)
   (setq-default tab-width ian/indent-width))
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (prefer-coding-system 'utf-8)
+  (setq inhibit-startup-message t)
+  (setq c-basic-offset 2)
+  (setq-default c-basic-offset 2)
+  (setq-default indent-tabs-mode nil)
 
-(use-package "startup"
-  :ensure nil
-  :config
-  (setq initial-scratch-message ""))
 
-;; Overriding built-in function
-(defun use-fancy-splash-screens-p ()
-  "Always display splash screen with Emacs PNG logo."
-  t)
 
 ;;; Built-in packages
 
@@ -192,6 +198,11 @@
   :config
   (setq css-indent-offset ian/indent-width))
 
+(use-package prettier
+  :ensure nil
+  :config
+  (add-hook 'after-init-hook #'global-prettier-mode))
+
 (use-package mwheel
   :ensure nil
   :config
@@ -286,11 +297,8 @@
           "/Library/TeX/texbin/pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f; rm *.tex *.out *.aux *.log"
           "/Library/TeX/texbin/pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f; rm *.tex *.out *.aux *.log")))
 
-(use-package faces
-  :ensure nil
-  :config
-  (when (member "Segoe UI" (font-family-list))
-    (set-face-attribute 'variable-pitch nil :family "Segoe UI" :weight 'normal :height 1.0)))
+(set-face-attribute 'default nil :family "Anonymous Pro" :height 120)
+
 
 ;;; Third-party Packages
 
@@ -317,63 +325,6 @@
   :config
   :hook (after-init . global-emojify-mode))
 
-;; Vi keybindings
-
-(use-package evil
-  :init
-  (setq evil-want-C-u-scroll t
-        evil-want-keybinding nil
-        evil-shift-width ian/indent-width)
-  :hook (after-init . evil-mode)
-  :preface
-  (defun ian/save-and-kill-this-buffer ()
-    (interactive)
-    (save-buffer)
-    (kill-this-buffer))
-  :config
-  (setq-default cursor-type  '(hbar . 5))
-  (setq evil-emacs-state-cursor '(hbar . 5))
-  (with-eval-after-load 'evil-maps
-    (define-key evil-normal-state-map (kbd "gd") #'xref-find-definitions)
-    (define-key evil-normal-state-map (kbd "<f12>") #'xref-find-definitions)
-    (define-key evil-insert-state-map (kbd "C-n") nil) ; avoid conflict with company tooltip selection
-    (define-key evil-insert-state-map (kbd "C-p") nil) ; avoid conflict with company tooltip selection
-    (define-key evil-normal-state-map (kbd "C-p") nil) ; avoid conflict with WSL find-file
-    (define-key evil-insert-state-map (kbd "C-S-C") #'evil-yank)         ; for WSL
-    (define-key evil-normal-state-map (kbd "C-S-C") #'evil-yank)         ; for WSL
-    (define-key evil-insert-state-map (kbd "C-S-V") #'evil-paste-before) ; for WSL
-    )
-  (evil-ex-define-cmd "q" #'kill-this-buffer)
-  (evil-ex-define-cmd "wq" #'ian/save-and-kill-this-buffer))
-
-(use-package evil-collection
-  :after evil
-  :config
-  (setq evil-collection-company-use-tng nil)
-  (evil-collection-init))
-
-(use-package evil-commentary
-  :after evil
-  :config
-  (evil-commentary-mode +1))
-
-(use-package evil-magit)
-
-(use-package evil-matchit
-  :hook (web-mode . turn-on-evil-matchit-mode))
-
-;; Git integration
-
-(use-package magit
-  :bind ("C-x g" . magit-status)
-  :config
-  (add-hook 'with-editor-mode-hook #'evil-insert-state))
-
-(use-package diff-hl
-  :hook ((prog-mode . diff-hl-mode)
-         (diff-hl-mode . diff-hl-flydiff-mode))
-  :config
-  (setq diff-hl-flydiff-delay 0.05))
 
 ;; Searching/sorting enhancements & project management
 
@@ -455,50 +406,112 @@
   :config
   (company-prescient-mode +1))
 
-;; Programming language support and utilities
+;; Programming support and utilities
 
 (use-package lsp-mode
+  :init
+  (setq lsp-keymap-prefix "C-c l")
   :hook ((c-mode          ; clangd
           c++-mode        ; clangd
           c-or-c++-mode   ; clangd
-          java-mode       ; eclipse-jdtls
+          ;; java-mode       ; eclipse-jdtls
           js-mode         ; ts-ls (tsserver wrapper)
           js-jsx-mode     ; ts-ls (tsserver wrapper)
           typescript-mode ; ts-ls (tsserver wrapper)
-          python-mode     ; mspyls
-          web-mode
-          ) . lsp)
+          python-mode     ; pyright
+          web-mode        ; ts-ls/HTML/CSS
+          haskell-mode    ; haskell-language-server
+          lua-mode        ; lua-language-server
+          rust-mode       ; rust-analyzer
+          ruby-mode       ; solargraph
+          ) . lsp-deferred)
+  :preface
+  (defun ian/lsp-execute-code-action ()
+    "Execute code action with pulse-line animation."
+    (interactive)
+    (ian/pulse-line)
+    (call-interactively 'lsp-execute-code-action))
+  :custom-face
+  (lsp-headerline-breadcrumb-symbols-face                ((t (:inherit variable-pitch))))
+  (lsp-headerline-breadcrumb-path-face                   ((t (:inherit variable-pitch))))
+  (lsp-headerline-breadcrumb-project-prefix-face         ((t (:inherit variable-pitch))))
+  (lsp-headerline-breadcrumb-unknown-project-prefix-face ((t (:inherit variable-pitch))))
   :commands lsp
   :config
+  (add-hook 'java-mode-hook #'(lambda () (when (eq major-mode 'java-mode) (lsp-deferred))))
+  ;; (define-key lsp-mode-map (kbd "C-c l <tab>") #'ian/lsp-execute-code-action)
+  (global-unset-key (kbd "<f2>"))
+  (define-key lsp-mode-map (kbd "<f2>") #'lsp-rename)
   (setq lsp-auto-guess-root t)
-  (setq lsp-diagnostic-package :none)             ; disable flycheck-lsp for most modes
-  (add-hook 'web-mode-hook #'lsp-flycheck-enable) ; enable flycheck-lsp for web-mode locally
+  (setq lsp-log-io nil)
+  (setq lsp-restart 'auto-restart)
+  (setq lsp-enable-links nil)
   (setq lsp-enable-symbol-highlighting nil)
   (setq lsp-enable-on-type-formatting nil)
+  (setq lsp-lens-enable nil)
   (setq lsp-signature-auto-activate nil)
+  (setq lsp-signature-render-documentation nil)
+  (setq lsp-eldoc-enable-hover nil)
+  (setq lsp-eldoc-hook nil)
   (setq lsp-modeline-code-actions-enable nil)
   (setq lsp-modeline-diagnostics-enable nil)
+  (setq lsp-headerline-breadcrumb-enable nil)
+  (setq lsp-headerline-breadcrumb-icons-enable nil)
+  (setq lsp-semantic-tokens-enable nil)
   (setq lsp-enable-folding nil)
   (setq lsp-enable-imenu nil)
   (setq lsp-enable-snippet nil)
-  (setq lsp-enable-completion-at-point nil)
-  (setq read-process-output-max (* 1024 1024)) ;; 1mb
-  (setq lsp-idle-delay 0.5)
-  (setq lsp-prefer-capf t) ; prefer lsp's company-capf over company-lsp
+  (setq lsp-enable-file-watchers nil)
+  (setq read-process-output-max (* 1024 1024)) ;; 1MB
+  (setq lsp-idle-delay 0.25)
+  (setq lsp-auto-execute-action nil)
+  (with-eval-after-load 'lsp-clangd
+    (add-to-list 'lsp-clients-clangd-args "--header-insertion=never"))
   (add-to-list 'lsp-language-id-configuration '(js-jsx-mode . "javascriptreact")))
+
+(use-package lsp-ui
+  :commands lsp-ui-mode
+  :custom-face
+  (lsp-ui-doc-background ((t (:background nil))))
+  :config
+  (custom-set-faces '(lsp-ui-sideline-global ((t (:italic t)))))
+  ;;(setq lsp-ui-doc-enable nil)
+  ;;(setq lsp-ui-doc-use-childframe t)
+  ;;(setq lsp-ui-doc-position 'at-point)
+  ;;(setq lsp-ui-doc-include-signature t)
+  ;;(setq lsp-ui-doc-border (face-foreground 'default))
+  ;;(setq lsp-ui-sideline-show-code-actions nil)
+  ;;(setq lsp-ui-peek-always-show t)
+  ;;(setq lsp-ui-sideline-delay 0.05))
 
 (use-package lsp-java
   :after lsp)
 
-(use-package modern-cpp-font-lock
-  :hook (c++-mode . modern-c++-font-lock-mode))
+(use-package java
+  :ensure nil
+  :after lsp-java
+  :bind (:map java-mode-map ("C-c i" . lsp-java-add-import)))
 
-(use-package lsp-python-ms
-  :hook (python-mode . (lambda () (require 'lsp-python-ms)))
-  :config
-  (setq lsp-python-ms-executable
-        "~/python-language-server/output/bin/Release/osx-x64/publish/Microsoft.Python.LanguageServer")
-  (setq lsp-python-ms-python-executable-cmd "python3"))
+(use-package lsp-haskell)
+
+(use-package lsp-pyright
+  :hook (python-mode . (lambda () (require 'lsp-pyright)))
+  :init (when (executable-find "python3")
+          (setq lsp-pyright-python-executable-cmd "python3")))
+
+;; (use-package tree-sitter
+;;   :custom-face
+;;   (tree-sitter-hl-face:method.call      ((t (:inherit font-lock-function-name-face))))
+;;   (tree-sitter-hl-face:function.call    ((t (:inherit font-lock-function-name-face))))
+;;   (tree-sitter-hl-face:function.builtin ((t (:inherit font-lock-function-name-face))))
+;;   (tree-sitter-hl-face:operator         ((t (:inherit default))))
+;;   (tree-sitter-hl-face:type.builtin     ((t (:inherit font-lock-type-face))))
+;;   (tree-sitter-hl-face:number           ((t (:inherit highlight-numbers-number))))
+;;   :config
+;;   (global-tree-sitter-mode)
+;;   (add-hook 'tree-sitter-after-on-hook #'tree-sitter-hl-mode))
+
+;; (use-package tree-sitter-langs)
 
 (use-package pyvenv
   :config
@@ -508,70 +521,121 @@
                 (call-interactively #'lsp-workspace-restart)))
   (pyvenv-mode +1))
 
-(use-package cobol-mode
-  :config
-  (setq cobol-tab-width ian/indent-width)
-  (setq auto-mode-alist
-        (append
-         '(("\\.cob\\'" . cobol-mode)
-           ("\\.cbl\\'" . cobol-mode))
-         auto-mode-alist)))
-
 (use-package company
   :hook (prog-mode . company-mode)
   :config
+  (setq company-idle-delay 0.2)
+  (setq company-tooltip-minimum-width 60)
+  (setq company-tooltip-maximum-width 60)
+  (setq company-tooltip-limit 12)
   (setq company-minimum-prefix-length 1)
-  (setq company-selection-wrap-around t)
   (setq company-tooltip-align-annotations t)
   (setq company-frontends '(company-pseudo-tooltip-frontend ; show tooltip even for single candidate
                             company-echo-metadata-frontend))
-  (with-eval-after-load 'company
-    (define-key company-active-map (kbd "C-j") nil) ; avoid conflict with emmet-mode
-    (define-key company-active-map (kbd "C-n") #'company-select-next)
-    (define-key company-active-map (kbd "C-p") #'company-select-previous)))
+  (define-key company-active-map (kbd "C-j") nil) ; avoid conflict with emmet-mode
+  (define-key company-active-map (kbd "C-n") #'company-select-next)
+  (define-key company-active-map (kbd "C-p") #'company-select-previous)
+  (define-key company-active-map (kbd "TAB") 'company-select-next)
+  (define-key company-active-map (kbd "<tab>") 'company-select-next)
+  (define-key company-active-map (kbd "<backtab>") 'company-select-previous))
 
 (use-package flycheck
-  :hook ((prog-mode . flycheck-mode))
+  :hook ((prog-mode . flycheck-mode)
+         (markdown-mode . flycheck-mode)
+         (org-mode . flycheck-mode))
   :config
   (setq flycheck-check-syntax-automatically '(save mode-enabled newline))
   (setq flycheck-display-errors-delay 0.1)
-  (setq flycheck-flake8rc "~/.config/flake8"))
+  (setq-default flycheck-disabled-checkers '(python-pylint))
+  (setq flycheck-flake8rc "~/.config/flake8")
+  (setq flycheck-checker-error-threshold 1000)
+  (setq flycheck-indication-mode nil)
+  (define-key flycheck-mode-map (kbd "<f8>") #'flycheck-next-error)
+  (define-key flycheck-mode-map (kbd "S-<f8>") #'flycheck-previous-error)
+  (flycheck-define-checker proselint
+    "A linter for prose. Install the executable with `pip3 install proselint'."
+    :command ("proselint" source-inplace)
+    :error-patterns
+    ((warning line-start (file-name) ":" line ":" column ": "
+              (id (one-or-more (not (any " "))))
+              (message) line-end))
+    :modes (markdown-mode org-mode))
+  (add-to-list 'flycheck-checkers 'proselint))
 
-(use-package org
-  :hook ((org-mode . visual-line-mode)
-         (org-mode . auto-fill-mode)
-         (org-mode . org-indent-mode)
-         (org-mode . (lambda () (setq-local evil-auto-indent nil))))
+(use-package markdown-mode
+  :hook (markdown-mode . auto-fill-mode)
   :config
-  (setq org-descriptive-links nil)
-  (setq org-startup-folded nil)
-  (setq org-todo-keywords '((sequence "TODO" "DOING" "DONE")))
-  (setq org-html-checkbox-type 'html))
+  (set-face-attribute 'markdown-code-face nil :inherit 'org-block))
 
-(use-package org-bullets
-  :hook (org-mode . org-bullets-mode))
-
-(use-package markdown-mode)
-
-(use-package web-mode
-  :mode (("\\.html?\\'" . web-mode)
-         ("\\.css\\'"   . web-mode)
-         ("\\.jsx?\\'"  . web-mode)
-         ("\\.tsx?\\'"  . web-mode)
-         ("\\.json\\'"  . web-mode))
+(use-package typescript-mode
+  :mode ("\\.tsx?\\'" . typescript-mode)
   :config
-  (setq web-mode-markup-indent-offset ian/indent-width)
-  (setq web-mode-code-indent-offset ian/indent-width)
-  (setq web-mode-css-indent-offset ian/indent-width)
-  (setq web-mode-content-types-alist '(("jsx" . "\\.js[x]?\\'"))))
+  (setq typescript-indent-level ian/indent-width))
+
+(use-package rust-mode)
+
+(defun ime-go-before-save ()
+  (interactive)
+  (when lsp-mode
+    (lsp-organize-imports)
+    (lsp-format-buffer)))
+
+(use-package go-mode
+  :defer t
+  :straight t
+  :config
+  (add-hook 'go-mode-hook 'lsp-deferred)
+  (add-hook 'go-mode-hook
+            (lambda ()
+              (add-hook 'before-save-hook 'ime-go-before-save))))
+
+(use-package flycheck-rust
+  :config
+  (with-eval-after-load 'rust-mode
+    (add-hook 'flycheck-mode-hook #'flycheck-rust-setup)))
+
+(use-package lua-mode)
+
+(use-package json-mode)
+
+(use-package vimrc-mode)
+
+(use-package cmake-font-lock)
+
+(use-package yaml-mode)
+
+(use-package haskell-mode)
+
+(use-package rjsx-mode
+  :mode ("\\.jsx?\\'" . rjsx-mode)
+  :custom-face
+  (js2-error   ((t (:inherit default :underscore nil))))
+  (js2-warning ((t (:inherit default :underscore nil))))
+  :config
+  (define-key rjsx-mode-map "<" nil)
+  (define-key rjsx-mode-map (kbd "C-d") nil)
+  (define-key rjsx-mode-map ">" nil))
+
+;; (use-package web-mode
+;;   :mode (("\\.html?\\'" . web-mode)
+;;          ("\\.css\\'"   . web-mode)
+;;          ("\\.jsx?\\'"  . web-mode)
+;;          ("\\.tsx?\\'"  . web-mode)
+;;          ("\\.json\\'"  . web-mode))
+;;   :config
+;;   (setq web-mode-markup-indent-offset ian/indent-width)
+;;   (setq web-mode-code-indent-offset ian/indent-width)
+;;   (setq web-mode-css-indent-offset ian/indent-width)
+;;   (setq web-mode-content-types-alist '(("jsx" . "\\.js[x]?\\'"))))
 
 (use-package emmet-mode
-  :hook ((html-mode       . emmet-mode)
-         (css-mode        . emmet-mode)
-         (js-mode         . emmet-mode)
-         (js-jsx-mode     . emmet-mode)
-         (typescript-mode . emmet-mode)
-         (web-mode        . emmet-mode))
+  :hook ((html-mode
+          css-mode
+          js-mode
+          js-jsx-mode
+          typescript-mode
+          web-mode
+          ) . emmet-mode)
   :config
   (setq emmet-insert-flash-time 0.001) ; effectively disabling it
   (add-hook 'js-jsx-mode-hook #'(lambda ()
@@ -587,18 +651,51 @@
   (defun ian/format-code ()
     "Auto-format whole buffer."
     (interactive)
-    (if (derived-mode-p 'prolog-mode)
-        (prolog-indent-buffer)
-      (format-all-buffer)))
-  (defalias 'format-document #'ian/format-code))
+    (let ((windowstart (window-start)))
+      (if (derived-mode-p 'prolog-mode)
+          (prolog-indent-buffer)
+        (format-all-buffer))
+      (set-window-start (selected-window) windowstart)))
+  (defalias 'format-document #'ian/format-code)
+  :config
+  (global-set-key (kbd "<f6>") #'ian/format-code)
+  (add-hook 'prog-mode-hook #'format-all-ensure-formatter)
+  (add-hook 'python-mode-hook #'(lambda ()
+                                  (setq-local format-all-formatters '(("Python" yapf)))))
+  (add-hook 'sql-mode-hook #'(lambda ()
+                               (setq-local format-all-formatters '(("SQL" pgformatter))))))
 
 (use-package rainbow-mode
-  :hook (web-mode . rainbow-mode))
+  :config
+  (bind-key* (kbd "C-c r") #'rainbow-mode))
 
 (use-package hl-todo
+  :custom-face
+  (hl-todo                        ((t (:inverse-video nil :italic t :bold nil))))
   :config
   (add-to-list 'hl-todo-keyword-faces '("DOING" . "#94bff3"))
+  (add-to-list 'hl-todo-keyword-faces '("WHY" . "#7cb8bb"))
   (global-hl-todo-mode +1))
+
+(use-package processing-mode
+  :after company
+  :preface
+  (defvar processing-company--keywords
+    (with-eval-after-load 'processing-mode
+      (cons 'processing-mode (append processing-functions
+                                     processing-builtins
+                                     processing-constants))))
+  (defun processing-company--init ()
+    (setq-local company-backends '((company-keywords
+                                    :with
+                                    company-yasnippet
+                                    company-dabbrev-code)))
+    (make-local-variable 'company-keywords-alist)
+    (add-to-list 'company-keywords-alist processing-company--keywords))
+  :config
+  (add-hook 'processing-mode-hook 'processing-company--init)
+  (setq processing-sketchbook-dir (format "%s/Projects/Processing/sketchbooks" (getenv "HOME")))
+  (setq processing-location (format "%s/processing-3.5.4/processing-java" (getenv "HOME"))))
 
 ;;; Dired enhancements
 
@@ -620,42 +717,8 @@
   (setq dired-subtree-use-backgrounds nil)
   :bind (:map dired-mode-map ("<tab>" . dired-subtree-toggle)))
 
-;; Terminal integration
-
-(use-package vterm ; when installing, evaluate exec-path first (else 'command not found')
-  :hook (vterm-mode . (lambda ()
-                        (setq-local global-hl-line-mode nil)
-                        (setq-local line-spacing nil)))
-  :config
-  (define-key vterm-mode-map (kbd "C-l") #'(lambda ()
-                                             (interactive)
-                                             (vterm-clear)
-                                             (vterm-clear-scrollback))))
-
-(use-package vterm-toggle
-  :after (projectile vterm evil)
-  :config
-  (setq vterm-toggle-fullscreen-p nil)
-  (setq vterm-toggle-scope 'projectile)
-  (with-eval-after-load 'evil
-    (evil-set-initial-state 'vterm-mode 'emacs))
-  (global-set-key (kbd "C-`") #'vterm-toggle)
-  (global-set-key (kbd "s-j") #'vterm-toggle)
-  (add-to-list 'display-buffer-alist
-               '((lambda (bufname _) (with-current-buffer bufname (equal major-mode 'vterm-mode)))
-                 (display-buffer-reuse-window display-buffer-at-bottom)
-                 (reusable-frames . visible)
-                 (window-height . 0.7))))
 
 ;; Misc
-
-(use-package pdf-tools
-  :mode (("\\.pdf\\'" . pdf-view-mode))
-  :bind ((:map pdf-view-mode-map ("C--" . pdf-view-shrink))
-         (:map pdf-view-mode-map ("C-=" . pdf-view-enlarge))
-         (:map pdf-view-mode-map ("C-0" . pdf-view-scale-reset)))
-  :config
-  (pdf-loader-install))
 
 (use-package smart-mode-line
   :config
@@ -675,4 +738,3 @@
     (exec-path-from-shell-initialize)))
 
 (provide 'init)
-;;; init.el ends here
